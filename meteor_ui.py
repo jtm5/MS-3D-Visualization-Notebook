@@ -1,7 +1,7 @@
 """Input form for the Meteor Scatter 3D Explorer notebook.
 
 show_form() displays the fields, the buttons and four result tabs (Summary, Static plots, Tables,
-3D explorer), then draws the results once with the default values. The maths lives in meteor_core.py.
+3D explorer), the results are drawn by draw_results(), run in the next cell. The maths lives in meteor_core.py.
 """
 import traceback
 import webbrowser
@@ -22,6 +22,7 @@ DEFAULTS = dict(
 _DESC_W = {"description_width": "125px"}
 _FIELD = w.Layout(width="300px")
 _BOX = w.Layout(border="1px solid #8885", padding="6px 10px", margin="0 8px 8px 0")
+_pending = {}   # holds the form's run function between show_form() and draw_results()
 
 
 def _num(label, key, tip):
@@ -37,7 +38,7 @@ def _box(title, *fields):
 
 
 def show_form():
-    """Build and display the form, then draw the results once with the default values."""
+    """Build and display the form. Results are drawn afterwards by draw_results()."""
     f = dict(
         tx_name=_text("Name", "tx_name", "Label used on the TX marker and the page title."),
         tx_lat=_num("Latitude (°)", "tx_lat", "Decimal degrees. North is positive."),
@@ -192,4 +193,11 @@ def show_form():
         w.HBox([run, reset, swap, browser]),
         tabs,
     ]))
-    on_run()
+    _pending["run"] = on_run
+
+
+def draw_results():
+    """Draw the results into the form's tabs. Called from its own cell so the form is already on screen."""
+    if "run" not in _pending:
+        raise RuntimeError("Run the form cell above first.")
+    _pending["run"]()

@@ -29,7 +29,7 @@ pip install numpy matplotlib plotly ipywidgets
 ## Using the notebook
 
 1. Open `meteor_scatter_3d_form.ipynb` and choose a Python kernel when VS Code asks.
-2. Choose **Run All** (toolbar at the top). There are only two code cells: a package check and the form. The run ends on the form, already filled in with the WDPN example and showing results.
+2. Choose **Run All** (toolbar at the top). There are three code cells: a package check, the form, and one that draws the first results into the form's tabs (scroll back up to see them).
 3. Change the fields and click **Update and run**. Nothing else needs to be run again.
 
 The results appear under the buttons in four tabs:
