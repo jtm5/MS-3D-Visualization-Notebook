@@ -19,11 +19,11 @@ Keep the notebook, `meteor_ui.py` and `meteor_core.py` in the same folder.
 
 ## What you need
 
-- Python 3 with `numpy`, `matplotlib`, `plotly` and `ipywidgets`
+- Python 3 with `numpy`, `matplotlib`, `plotly` and `ipywidgets` **version 8 or newer** (with version 7 the form can silently fail to appear in VS Code)
 - VS Code with the **Python** and **Jupyter** extensions (or any other Jupyter front end that supports widgets)
 
 ```bash
-pip install numpy matplotlib plotly ipywidgets
+pip install -r requirements.txt
 ```
 
 ## Using the notebook
@@ -94,7 +94,8 @@ If you edit `meteor_core.py` or `meteor_ui.py`, restart the kernel and Run All a
 
 ## Troubleshooting
 
-- **The first cell stops with "Missing packages".** Run the `pip install` line it prints, restart the kernel, and Run All again.
+- **The form does not appear (the cell runs but shows nothing).** Check `ipywidgets` is version 8 or newer (`pip install -U "ipywidgets>=8"`), then restart the kernel and Run All again.
+- **The first cell stops with "Missing packages" or "ipywidgets is too old".** Run the `pip install` line it prints, restart the kernel, and Run All again.
 - **`ModuleNotFoundError: meteor_ui` or `meteor_core`.** The notebook must be in the same folder as the two `.py` files, and the kernel must have started in that folder (VS Code does this when you open the notebook from the Explorer).
 - **I changed a `.py` file and nothing changed.** Restart the kernel and Run All again.
 - **The 3D page does not appear in its tab.** Some viewers block embedded pages. Click **Open 3D page in browser**, or open `meteor_3d_interactive_form.html` directly.

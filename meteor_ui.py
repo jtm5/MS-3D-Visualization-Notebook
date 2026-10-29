@@ -26,11 +26,11 @@ _pending = {}   # holds the form's run function between show_form() and draw_res
 
 
 def _num(label, key, tip):
-    return w.FloatText(value=DEFAULTS[key], description=label, description_tooltip=tip, style=_DESC_W, layout=_FIELD)
+    return w.FloatText(value=DEFAULTS[key], description=label, tooltip=tip, style=_DESC_W, layout=_FIELD)
 
 
 def _text(label, key, tip):
-    return w.Text(value=DEFAULTS[key], description=label, description_tooltip=tip, style=_DESC_W, layout=_FIELD)
+    return w.Text(value=DEFAULTS[key], description=label, tooltip=tip, style=_DESC_W, layout=_FIELD)
 
 
 def _box(title, *fields):
