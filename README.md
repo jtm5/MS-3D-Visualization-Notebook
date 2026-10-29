@@ -1,5 +1,9 @@
 # Meteor Scatter 3D Explorer: Jupyter notebook version
 
+[![Launch in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jtm5/MS-3D-Visualization-Notebook/main?urlpath=lab/tree/meteor_scatter_3d_form.ipynb)
+
+**Try it online, no install:** click the Binder badge above. The first launch can take a few minutes while Binder builds the environment; then choose **Run All**. On Binder the **Open 3D page in browser** button does not work (use the 3D explorer tab instead), and the session ends when idle.
+
 An interactive notebook for building intuition about **VHF forward meteor scatter**: where a meteor trail has to be, and how it has to be moving, to produce a given Doppler shift on a TV carrier received off-air.
 
 Default setup: WDPN-TV (Philadelphia, ch 2, 54.309441 MHz pilot) to a receiver near Washington DC, about a 210 km baseline. You can type in your own sites in the form at the bottom of the notebook.
