@@ -2,7 +2,7 @@
 
 [![Launch in Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/jtm5/MS-3D-Visualization-Notebook/main?urlpath=lab/tree/meteor_scatter_3d_form.ipynb)
 
-**Try it online, no install:** click the Binder badge above. The first launch can take a few minutes while Binder builds the environment. Then choose **Run All**, scroll up to the form under Step 2, and look under its buttons for the four tabs: *Summary*, *Static plots*, *Tables* and **3D explorer** (click that tab for the interactive 3D plot). On Binder the **Open 3D page in browser** button does not work; instead right-click `meteor_3d_interactive_form.html` in the file list and choose **Open in New Browser Tab**. (Opening it in JupyterLab's own viewer shows the sliders but no plot.) The session ends when idle.
+**Try it online, no install:** click the Binder badge above. The first launch can take a few minutes while Binder builds the environment. Then choose **Run All**, scroll up to the form under Step 2, and look under its buttons for the four tabs: *Summary*, *Static plots*, *Tables* and **3D explorer** (click that tab for the interactive 3D plot). This will open in the binder window. You can also open this in another browser window if you wish; however, on Binder the **Open 3D page in browser** button does not work; instead right-click `meteor_3d_interactive_form.html` in the file list and choose **Open in New Browser Tab**. (Opening it in JupyterLab's own viewer shows the sliders but no plot.) The session ends when idle.
 
 An interactive notebook for building intuition about **VHF forward meteor scatter**: where a meteor trail has to be, and how it has to be moving, to produce a given Doppler shift on a TV carrier received off-air.
 
