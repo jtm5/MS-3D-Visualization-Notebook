@@ -4,7 +4,10 @@ Geometry and Doppler functions (from meteor_doppler_wdpn.py), the HTML/JavaScrip
 (from meteor_3d_interactive.py), and the plot, table and page-building helpers. The notebook form in
 meteor_ui.py calls configure() and then these functions. Most users never need to edit this file.
 """
+import io
 import json
+import urllib.request
+from pathlib import Path
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +15,11 @@ from plotly.offline import get_plotlyjs
 from IPython.display import IFrame
 
 PAGE_FILE = "meteor_3d_interactive_form.html"   # written next to the notebook by build_interactive()
+# Map drawn on the ground of the 3D page: a web-Mercator tile server ({z}/{y}/{x}), its credit line, and a
+# folder where downloaded tiles are kept so later runs work offline. Set MAP_TILES = None for plain green ground.
+MAP_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+MAP_CREDIT = "Map tiles © Esri"
+TILE_CACHE = Path(".tile_cache")
 
 # ---- Constants and current setup ------------------------------------------------------------
 A, E2 = 6378137.0, 0.00669437999014   # WGS-84 semi-major axis (m) and first eccentricity squared
@@ -175,7 +183,7 @@ small{color:var(--mut)}h1{font-size:15px;margin:0 0 6px}
 <label>Speed <b id="vv"></b></label><input id="v" type="range" min="11" max="72" step="1" value="20">
 <div><button id="snap">Set descent for 0 Hz at this heading</button></div>
 <div><label style="justify-content:flex-start;gap:6px"><input id="ex" type="checkbox"> vertical exaggeration ×2</label></div>
-<div style="margin-top:8px"><small>Blue shell = surface of equal TX→P→RX path length through the reflection point (the 0 Hz "tangent" surface for that point). Green path: |f<sub>D</sub>| ≤ 100 Hz at P; red: outside. Convention: + Hz = path shortening. Straight-line paths, no refraction. Ground curvature is real.</small></div>
+<div style="margin-top:8px"><small>Blue shell = surface of equal TX→P→RX path length through the reflection point (the 0 Hz "tangent" surface for that point). Green path: |f<sub>D</sub>| ≤ 100 Hz at P; red: outside. Convention: + Hz = path shortening. Straight-line paths, no refraction. Ground curvature is real. The view is centered on RX. <span id="credit"></span></small></div>
 </div>
 <div id="plots"><div id="g3" style="height:560px"></div><div id="g2" style="height:240px"></div></div></div>
 <script>__PLOTLY__</script>
@@ -186,14 +194,15 @@ const K=__K__; const D2R=Math.PI/180;
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sc=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const nrm=a=>Math.sqrt(dot(a,a)),un=a=>sc(a,1/nrm(a));
-const T=K.T,R=K.R,Z=K.Z;   // TX, RX positions and polar axis, all in the page frame (km)
-const t0=un(sub(T,R)).map((v,i)=>v); const up0=[0,0,1];   // t0: unit vector RX->TX (unused below); up0: page "up"
+// TX, RX, baseline midpoint (on the ground) and polar axis, all in the page frame (km); the RX ground point is the origin
+const T=K.T,R=K.R,M=K.M,Z=K.Z;
+const upM=un(sub(M,K.C));   // local up at the midpoint
 // tb: horizontal unit vector along the baseline (RX->TX); sd: horizontal unit vector perpendicular to it (the "offset" direction)
-const tb=un(sub(sub(T,R),sc(up0,dot(sub(T,R),up0)))), sd=cr(up0,tb);
+const tb=un(sub(sub(T,R),sc(upM,dot(sub(T,R),upM)))), sd=cr(upM,tb);
 // local frame at point P: up = away from Earth's center, e = east, n = north (all unit vectors)
 function frame(P){const up=un(sub(P,K.C));const e=un(cr(Z,up));const n=cr(up,e);return{up,e,n}}
-// reflection point x km along the baseline and y km to the side of the origin, h km above the curved ground
-function place(x,y,h){const P0=add(sc(tb,x),sc(sd,y));return add(K.C,sc(un(sub(P0,K.C)),K.RE+h))}
+// reflection point x km along the baseline and y km to the side of the midpoint, h km above the curved ground
+function place(x,y,h){const P0=add(M,add(sc(tb,x),sc(sd,y)));return add(K.C,sc(un(sub(P0,K.C)),K.RE+h))}
 // unit velocity vector at P for heading az (deg from N) and descent d (deg below horizontal)
 function vel(P,az,d){const f=frame(P),a=az*D2R,dd=d*D2R;
   return add(add(sc(f.e,Math.cos(dd)*Math.sin(a)),sc(f.n,Math.cos(dd)*Math.cos(a))),sc(f.up,-Math.sin(dd)))}
@@ -212,12 +221,19 @@ function ellipsoid(P){const S=nrm(sub(P,T))+nrm(sub(P,R)),c=sc(add(T,R),.5),ax=u
       const p=add(add(c,sc(ax,a*Math.cos(th))),sc(add(sc(e1,Math.cos(ph)),sc(e2,Math.sin(ph))),b*Math.sin(th)));
       const under=nrm(sub(p,K.C))<K.RE;rx.push(under?null:p[0]);ry.push(under?null:p[1]);rz.push(under?null:p[2]);}}
   return{X,Y,Zz,S,a,b}}
-// ground: 45x45 grid (15 km spacing, +-330 km) of the curved Earth surface, GX/GY/GZ = East, North, height
-const GX=[],GY=[],GZ=[];for(let i=0;i<=44;i++){GX[i]=[];GY[i]=[];GZ[i]=[];for(let j=0;j<=44;j++){const x=-330+15*j,y=-330+15*i;GX[i].push(x);GY[i].push(y);GZ[i].push(Math.sqrt(K.RE*K.RE-x*x-y*y)-K.RE)}}
+// ground: (GN+1)x(GN+1) grid over +-K.G km East/North of RX, lifted onto the sphere of radius RE about Earth's center,
+// drawn as a mesh of two triangles per cell. K.MAP holds one map colour per cell (6 hex digits each), or is null for plain green.
+const GN=K.GN,gx=[],gy=[],gz=[],gi=[],gj=[],gk=[],gc=[];
+for(let i=0;i<=GN;i++)for(let j=0;j<=GN;j++){const x=-K.G+2*K.G*j/GN,y=-K.G+2*K.G*i/GN,dx=x-K.C[0],dy=y-K.C[1];
+  gx.push(x);gy.push(y);gz.push(K.C[2]+Math.sqrt(K.RE*K.RE-dx*dx-dy*dy))}
+for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){const a=i*(GN+1)+j,b=a+1,c=a+GN+1,d=c+1;gi.push(a,b);gj.push(b,d);gk.push(c,c);
+  if(K.MAP){const h='#'+K.MAP.substr(6*(i*GN+j),6);gc.push(h,h)}}
+const gnd=K.MAP?{facecolor:gc,opacity:1}:{color:'#556b2f',opacity:.25};
+document.getElementById('credit').textContent=K.MAP?K.CREDIT:'';
 const col=s=>[[0,s],[1,s]];   // single-colour colorscale
 // 3-D traces. Indices matter: update() restyles 1 (ellipsoid), 5 (path), 6 (arrowhead), 7 (RX-P-TX lines), 8 (point P)
 const tr=[
- {type:'surface',x:GX,y:GY,z:GZ,showscale:false,opacity:.25,colorscale:col('#556b2f'),hoverinfo:'skip',name:'ground'},
+ {type:'mesh3d',x:gx,y:gy,z:gz,i:gi,j:gj,k:gk,...gnd,flatshading:true,lighting:{ambient:1,diffuse:0,specular:0,fresnel:0},hoverinfo:'skip',name:'ground'},
  {type:'surface',x:[[0]],y:[[0]],z:[[0]],showscale:false,opacity:.33,colorscale:col('#4c78a8'),hoverinfo:'skip',name:'equal-path ellipsoid'},
  {type:'scatter3d',mode:'markers+text',x:[T[0]],y:[T[1]],z:[T[2]],text:['WDPN TX'],textposition:'top center',marker:{size:6,color:'red'},name:'TX'},
  {type:'scatter3d',mode:'markers+text',x:[R[0]],y:[R[1]],z:[R[2]],text:['RX'],textposition:'top center',marker:{size:6,color:'blue'},name:'RX'},
@@ -229,7 +245,8 @@ const tr=[
 const dark=matchMedia('(prefers-color-scheme:dark)').matches;   // match plot text to the page theme
 // layout for the 3-D plot (lay) and, below, for the Doppler-vs-distance plot (lay2)
 const lay={margin:{l:0,r:0,t:0,b:0},showlegend:false,paper_bgcolor:'rgba(0,0,0,0)',font:{color:dark?'#ddd':'#222'},
- scene:{xaxis:{title:'East km'},yaxis:{title:'North km'},zaxis:{title:'Up km',range:[-10,140]},aspectmode:'data',camera:{eye:{x:1.2,y:-1.6,z:.8}}}};
+ scene:{xaxis:{title:{text:'East km'},range:[-K.G,K.G]},yaxis:{title:{text:'North km'},range:[-K.G,K.G]},zaxis:{title:{text:'Up km'},range:K.ZR},
+  aspectmode:'manual',aspectratio:K.AR,camera:{eye:{x:1.2,y:-1.6,z:.8}}}};   // fixed ranges keep RX (the origin) in the center
 Plotly.newPlot('g3',tr,lay,{responsive:true});
 const lay2={margin:{l:55,r:10,t:22,b:36},title:{text:'Doppler along the trail (the meteor moves →)',font:{size:12}},xaxis:{title:'distance along trail from reflection point P, km'},yaxis:{title:'f_D, Hz'},
  paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:dark?'#ddd':'#222'},showlegend:false,
@@ -269,8 +286,8 @@ $('snap').onclick=()=>{const x=+$('x').value,y=+$('y').value,h=+$('h').value,az=
   if(d>=0&&d<=90){$('d').value=d.toFixed(1);update()}else{$('fdinfo').firstChild.innerHTML='<b>No 0 Hz descent at this heading</b> (it would have to climb: '+d.toFixed(1)+'°). Try another heading.'}};
 // preset buttons: put the reflection point 1/4 from RX, at the midpoint, or 1/4 from TX, on the baseline
 document.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>{$('x').value={q:-52,m:0,t:52}[b.dataset.p];$('y').value=0;update()});
-// vertical exaggeration checkbox: switch between true-scale axes and a flattened manual aspect ratio
-$('ex').onchange=e=>Plotly.relayout('g3',{'scene.aspectmode':e.target.checked?'manual':'data','scene.aspectratio':{x:1,y:1,z:.5}});
+// vertical exaggeration checkbox: double the true-scale height of the box (K.AR)
+$('ex').onchange=e=>Plotly.relayout('g3',{'scene.aspectratio':e.target.checked?{...K.AR,z:2*K.AR.z}:K.AR});
 update();
 </script></body></html>"""
 
@@ -389,8 +406,6 @@ def scale_page(page, base_km, tx_name, rx_name, left_dir):
     step_x = max(1, int(round(base_km / 210)))     # along-path slider step (km)
     ymax = int(round(base_km * 1.2 / 10)) * 10     # offset slider range, slightly more than the baseline
     step_y = max(1, int(round(ymax / 50)))         # offset slider step (km), 50 steps per side
-    gstep = 15 * base_km / 210                     # ground-patch grid spacing (km); 44 steps across
-    gstart = 22 * gstep                            # ground patch runs from -gstart to +gstart
     clean = lambda s, default: "".join(ch for ch in s if ch not in "'\"<>&\\") or default   # keep names HTML/JS safe
     name, rx = clean(tx_name, "TX"), clean(rx_name, "RX")
     swaps = [
@@ -399,7 +414,6 @@ def scale_page(page, base_km, tx_name, rx_name, left_dir):
         ('id="y" type="range" min="-250" max="250" step="5" value="0"',
          f'id="y" type="range" min="{-ymax}" max="{ymax}" step="{step_y}" value="0"'),
         ('{q:-52,m:0,t:52}', f'{{q:{-quarter},m:0,t:{quarter}}}'),
-        ('x=-330+15*j,y=-330+15*i', f'x=-{gstart:g}+{gstep:g}*j,y=-{gstart:g}+{gstep:g}*i'),
         ('WDPN 54.31 MHz → RX forward scatter', f'{name} {F/1e6:.2f} MHz → {rx} forward scatter'),
         ("text:['WDPN TX']", f"text:['{name} TX']"),
         ("text:['RX']", f"text:['{rx} RX']"),
@@ -413,28 +427,91 @@ def scale_page(page, base_km, tx_name, rx_name, left_dir):
             raise ValueError(f"scale_page: could not find this text in the template: {old}")
         page = page.replace(old, new)
     print(f"page scaled for a {base_km:.0f} km baseline: along-path +-{half} km (presets +-{quarter}), "
-          f"offset +-{ymax} km (+ = {left_dir}), ground patch +-{gstart:.0f} km")
+          f"offset +-{ymax} km (+ = {left_dir})")
     return page
+
+
+def _tile(z, x, y):
+    """One map tile as an RGB array, from TILE_CACHE if it was downloaded before."""
+    from PIL import Image
+    f = TILE_CACHE / f"{z}_{x}_{y}.png"
+    if not f.exists():
+        req = urllib.request.Request(MAP_TILES.format(z=z, x=x, y=y), headers={"User-Agent": "meteor-scatter-3d-notebook"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = r.read()
+        TILE_CACHE.mkdir(exist_ok=True)
+        f.write_bytes(data)
+    return np.asarray(Image.open(io.BytesIO(f.read_bytes())).convert("RGB"))
+
+
+def ground_map(lat, lon, cell_km):
+    """Map colours for the ground cells: lat/lon (deg) arrays of shape (n, s, n, s), s sample points across each
+    cell, are looked up in a mosaic of web-Mercator tiles and averaged per cell. Returns a hex string (6 digits
+    per cell, row by row), or None if MAP_TILES is None or the tiles cannot be fetched."""
+    if MAP_TILES is None:
+        return None
+    s = lat.shape[1]
+    lat = np.clip(lat, -85, 85)
+    # zoom: tile pixels a little smaller than the sample spacing, limited to about 100 tiles
+    z = int(np.clip(np.ceil(np.log2(156543.03 * np.cos(np.radians(lat.mean())) / (cell_km * 1e3 / s))), 2, 12))
+    while True:
+        # global pixel coordinates (256-pixel tiles) of every sample point at zoom z
+        px = (lon + 180) / 360 * 256 * 2 ** z
+        py = (1 - np.log(np.tan(np.radians(lat)) + 1 / np.cos(np.radians(lat))) / np.pi) / 2 * 256 * 2 ** z
+        tx0, tx1, ty0, ty1 = int(px.min() // 256), int(px.max() // 256), int(py.min() // 256), int(py.max() // 256)
+        if (tx1 - tx0 + 1) * (ty1 - ty0 + 1) <= 100 or z == 2:
+            break
+        z -= 1
+    try:
+        rows = [np.concatenate([_tile(z, tx % 2 ** z, ty) for tx in range(tx0, tx1 + 1)], axis=1)
+                for ty in range(ty0, ty1 + 1)]
+    except Exception as err:
+        print(f"map tiles unavailable ({err}); drawing plain ground")
+        return None
+    mosaic = np.concatenate(rows, axis=0)
+    ix = np.clip((px - tx0 * 256).astype(int), 0, mosaic.shape[1] - 1)
+    iy = np.clip((py - ty0 * 256).astype(int), 0, mosaic.shape[0] - 1)
+    rgb = mosaic[iy, ix].astype(float).mean(axis=(1, 3)).round().astype(np.uint8)   # (n, n, 3) cell averages
+    print(f"map: {(tx1 - tx0 + 1) * (ty1 - ty0 + 1)} tiles at zoom {z} ({MAP_CREDIT})")
+    return rgb.tobytes().hex()
 
 
 def build_interactive(tx_name, rx_name="RX", out_file=PAGE_FILE):
     """Write the interactive page for the current TX/RX and return an IFrame showing it."""
     T, R = ecef(*TX), ecef(*RX)                   # TX and RX positions in ECEF (m)
-    g0 = point_on_path(0.5, 0)                    # ground point at the baseline midpoint (lat, lon, alt)
-    E0, N0, U0 = enu(g0[0], g0[1])                # local East/North/Up axes at that point (the page's x/y/z)
-    O = ecef(g0[0], g0[1], 0)                     # origin of the page frame, in ECEF
+    E0, N0, U0 = enu(RX[0], RX[1])                # local East/North/Up axes at RX (the page's x/y/z)
+    O = ecef(RX[0], RX[1], 0)                     # origin of the page frame (RX ground point), in ECEF
     # loc: ECEF position (m) -> page-frame [x, y, z] in km; ldir: ECEF direction -> page-frame components
     loc = lambda p: [float(((np.asarray(p) - O) / 1e3) @ a) for a in (E0, N0, U0)]
     ldir = lambda v: [float(np.asarray(v) @ a) for a in (E0, N0, U0)]
     CEN = loc([0, 0, 0])                          # Earth's center in the page frame (km)
-    # Constants handed to the page's JS: T/R positions, C Earth center, Z polar axis, RE local radius (km), LAM wavelength (m)
-    K = dict(T=loc(T), R=loc(R), C=CEN, Z=ldir([0, 0, 1]), RE=float(np.linalg.norm(CEN)), LAM=float(LAM))
+    RE = float(np.linalg.norm(CEN))               # local Earth radius (km)
+    M = loc(ecef(*point_on_path(0.5, 0)))         # baseline midpoint on the ground
+
+    # ground patch: +-G km East/North of RX in GN x GN cells, on the sphere of radius RE about CEN (as drawn by the page)
+    base = baseline_km()
+    G, GN, S = float(round(1.6 * base)), 300, 3   # S x S map samples are averaged per cell
+    u = (np.arange(GN * S) + 0.5) / (GN * S) * 2 * G - G
+    x, y = np.meshgrid(u, u)                      # rows run South -> North, like the page's grid
+    zg = CEN[2] + np.sqrt(RE ** 2 - (x - CEN[0]) ** 2 - (y - CEN[1]) ** 2)
+    p = O[:, None, None] + 1e3 * (x * E0[:, None, None] + y * N0[:, None, None] + zg * U0[:, None, None])
+    lat, lon, _ = geodetic(p, 0)
+    sh = (GN, S, GN, S)
+    MAP = ground_map(lat.reshape(sh), lon.reshape(sh), 2 * G / GN)
+    zmin = CEN[2] + np.sqrt(RE ** 2 - (G + abs(CEN[0])) ** 2 - (G + abs(CEN[1])) ** 2)   # lowest ground corner
+    ZR = [float(np.floor(zmin - 2)), 140.0]
+    AR = dict(x=1, y=1, z=(ZR[1] - ZR[0]) / (2 * G))   # true-scale box shape
+
+    # Constants handed to the page's JS: T/R/M positions, C Earth center, Z polar axis, RE local radius (km), LAM wavelength (m),
+    # ground patch half-size G and cells GN, axis range ZR and aspect AR, map colours MAP and credit
+    K = dict(T=loc(T), R=loc(R), M=M, C=CEN, Z=ldir([0, 0, 1]), RE=RE, LAM=float(LAM),
+             G=G, GN=GN, ZR=ZR, AR=AR, MAP=MAP, CREDIT=MAP_CREDIT)
 
     # which compass direction is to the LEFT when looking from RX toward TX (the page's "+ offset" side)
     d = np.array(K["T"]) - np.array(K["R"])
     left_dir = compass(np.degrees(np.arctan2(d[0], d[1])) - 90)
 
-    page = scale_page(PAGE, baseline_km(), tx_name, rx_name, left_dir)
+    page = scale_page(PAGE, base, tx_name, rx_name, left_dir)
     html = page.replace("__PLOTLY__", get_plotlyjs()).replace("__K__", json.dumps(K))
     with open(out_file, "w", encoding="utf-8") as fh:
         fh.write(html)

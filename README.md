@@ -23,7 +23,7 @@ Keep the notebook, `meteor_ui.py` and `meteor_core.py` in the same folder.
 
 ## What you need
 
-- Python 3 with `numpy`, `matplotlib`, `plotly` and `ipywidgets` **version 8 or newer** (with version 7 the form can silently fail to appear in VS Code)
+- Python 3 with `numpy`, `matplotlib`, `pillow`, `plotly` and `ipywidgets` **version 8 or newer** (with version 7 the form can silently fail to appear in VS Code)
 - VS Code with the **Python** and **Jupyter** extensions (or any other Jupyter front end that supports widgets)
 
 ```bash
@@ -71,13 +71,13 @@ The interactive page was designed around a 210 km baseline. When you click **Upd
 - the **Reflection point along path** slider range, step and starting position
 - the three preset buttons (¼ from RX, midpoint, ¼ from TX)
 - the **Offset from path** slider range and step
-- the size of the ground patch
+- the size of the ground patch (centered on RX) and the map tiles drawn on it
 - the page title, TX and RX markers, and the Doppler limit
 - the offset label, which names the compass direction to the left when looking from RX toward TX (for example `+ = NW`)
 
 ## Using the interactive 3D page
 
-- **3D view:** drag to rotate, scroll to zoom. It shows the ground, TX (red), RX (blue), the dashed baseline, the reflection point and the meteor trail as an arrow.
+- **3D view:** drag to rotate, scroll to zoom. The view is centered on RX. It shows the ground (a topographic map, with tiles downloaded on the first run and kept in `.tile_cache/`; set `MAP_TILES = None` in `meteor_core.py` for plain ground), TX (red), RX (blue), the dashed baseline, the reflection point and the meteor trail as an arrow.
 - **Blue shell:** the surface of constant TX to reflection point to RX path length. A meteor moving along it has zero Doppler.
 - **Trail colour:** green when |f<sub>D</sub>| is within the Doppler limit at the reflection point, red when it is outside.
 - **Sliders:** reflection point along the path, offset from the path, altitude, heading, descent angle and speed.
