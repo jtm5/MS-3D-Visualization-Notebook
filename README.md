@@ -77,7 +77,7 @@ The interactive page was designed around a 210 km baseline. When you click **Upd
 
 ## Using the interactive 3D page
 
-- **3D view:** drag to rotate, scroll to zoom. The view is centered on RX. It shows the ground (a topographic map, with tiles downloaded on the first run and kept in `.tile_cache/`; set `MAP_TILES = None` in `meteor_core.py` for plain ground), TX (red), RX (blue), the dashed baseline, the reflection point and the meteor trail as an arrow.
+- **3D view:** drag to rotate, scroll to zoom. The view is centered on RX. It shows the ground (a National Geographic map, with tiles downloaded on the first run and kept in `.tile_cache/`; untick **show map** for much faster slider response, or set `MAP_TILES = None` in `meteor_core.py` for plain ground; `MAP_CELLS` sets the map sharpness), TX (red), RX (blue), the dashed baseline, the reflection point and the meteor trail as an arrow.
 - **Blue shell:** the surface of constant TX to reflection point to RX path length. A meteor moving along it has zero Doppler.
 - **Trail colour:** green when |f<sub>D</sub>| is within the Doppler limit at the reflection point, red when it is outside.
 - **Sliders:** reflection point along the path, offset from the path, altitude, heading, descent angle and speed.

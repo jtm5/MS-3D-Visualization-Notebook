@@ -4,6 +4,7 @@ Geometry and Doppler functions (from meteor_doppler_wdpn.py), the HTML/JavaScrip
 (from meteor_3d_interactive.py), and the plot, table and page-building helpers. The notebook form in
 meteor_ui.py calls configure() and then these functions. Most users never need to edit this file.
 """
+import hashlib
 import io
 import json
 import urllib.request
@@ -17,9 +18,13 @@ from IPython.display import IFrame
 PAGE_FILE = "meteor_3d_interactive_form.html"   # written next to the notebook by build_interactive()
 # Map drawn on the ground of the 3D page: a web-Mercator tile server ({z}/{y}/{x}), its credit line, and a
 # folder where downloaded tiles are kept so later runs work offline. Set MAP_TILES = None for plain green ground.
-MAP_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
-MAP_CREDIT = "Map tiles © Esri"
+# Other servers that work here: .../World_Street_Map/... or .../World_Topo_Map/... on the same Esri host (credit "Map tiles © Esri"),
+# or "https://tile.openstreetmap.org/{z}/{x}/{y}.png" (credit "Map © OpenStreetMap contributors").
+MAP_TILES = "https://server.arcgisonline.com/ArcGIS/rest/services/NatGeo_World_Map/MapServer/tile/{z}/{y}/{x}"
+MAP_CREDIT = "Map tiles © Esri, National Geographic"
 TILE_CACHE = Path(".tile_cache")
+MAP_CELLS = 600     # map cells across the ground patch; more = sharper map but a larger page and slower redraws
+MAP_SAMPLES = 2     # map samples averaged across each cell (MAP_SAMPLES x MAP_SAMPLES per cell)
 
 # ---- Constants and current setup ------------------------------------------------------------
 A, E2 = 6378137.0, 0.00669437999014   # WGS-84 semi-major axis (m) and first eccentricity squared
@@ -183,6 +188,7 @@ small{color:var(--mut)}h1{font-size:15px;margin:0 0 6px}
 <label>Speed <b id="vv"></b></label><input id="v" type="range" min="11" max="72" step="1" value="20">
 <div><button id="snap">Set descent for 0 Hz at this heading</button></div>
 <div><label style="justify-content:flex-start;gap:6px"><input id="ex" type="checkbox"> vertical exaggeration ×2</label></div>
+<div id="mprow"><label style="justify-content:flex-start;gap:6px"><input id="mp" type="checkbox" checked> show map (off = faster sliders)</label></div>
 <div style="margin-top:8px"><small>Blue shell = surface of equal TX→P→RX path length through the reflection point (the 0 Hz "tangent" surface for that point). Green path: |f<sub>D</sub>| ≤ 100 Hz at P; red: outside. Convention: + Hz = path shortening. Straight-line paths, no refraction. Ground curvature is real. The view is centered on RX. <span id="credit"></span></small></div>
 </div>
 <div id="plots"><div id="g3" style="height:560px"></div><div id="g2" style="height:240px"></div></div></div>
@@ -190,6 +196,7 @@ small{color:var(--mut)}h1{font-size:15px;margin:0 0 6px}
 <script>
 // K = constants injected from Python (station positions, Earth center, wavelength); D2R converts degrees to radians
 const K=__K__; const D2R=Math.PI/180;
+const $=id=>document.getElementById(id);   // shorthand for getElementById
 // small 3-vector helpers: subtract, add, scale, dot, cross, norm, unit vector
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sc=(a,s)=>[a[0]*s,a[1]*s,a[2]*s];
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -221,19 +228,24 @@ function ellipsoid(P){const S=nrm(sub(P,T))+nrm(sub(P,R)),c=sc(add(T,R),.5),ax=u
       const p=add(add(c,sc(ax,a*Math.cos(th))),sc(add(sc(e1,Math.cos(ph)),sc(e2,Math.sin(ph))),b*Math.sin(th)));
       const under=nrm(sub(p,K.C))<K.RE;rx.push(under?null:p[0]);ry.push(under?null:p[1]);rz.push(under?null:p[2]);}}
   return{X,Y,Zz,S,a,b}}
-// ground: (GN+1)x(GN+1) grid over +-K.G km East/North of RX, lifted onto the sphere of radius RE about Earth's center,
-// drawn as a mesh of two triangles per cell. K.MAP holds one map colour per cell (6 hex digits each), or is null for plain green.
-const GN=K.GN,gx=[],gy=[],gz=[],gi=[],gj=[],gk=[],gc=[];
-for(let i=0;i<=GN;i++)for(let j=0;j<=GN;j++){const x=-K.G+2*K.G*j/GN,y=-K.G+2*K.G*i/GN,dx=x-K.C[0],dy=y-K.C[1];
-  gx.push(x);gy.push(y);gz.push(K.C[2]+Math.sqrt(K.RE*K.RE-dx*dx-dy*dy))}
-for(let i=0;i<GN;i++)for(let j=0;j<GN;j++){const a=i*(GN+1)+j,b=a+1,c=a+GN+1,d=c+1;gi.push(a,b);gj.push(b,d);gk.push(c,c);
-  if(K.MAP){const h='#'+K.MAP.substr(6*(i*GN+j),6);gc.push(h,h)}}
-const gnd=K.MAP?{facecolor:gc,opacity:1}:{color:'#556b2f',opacity:.25};
-document.getElementById('credit').textContent=K.MAP?K.CREDIT:'';
+// ground: (n+1)x(n+1) grid over +-K.G km East/North of RX, lifted onto the sphere of radius RE about Earth's center,
+// as a mesh3d trace with two triangles per cell
+function ground(n){const x=[],y=[],z=[],i=[],j=[],k=[];
+  for(let r=0;r<=n;r++)for(let c=0;c<=n;c++){const gx=-K.G+2*K.G*c/n,gy=-K.G+2*K.G*r/n,dx=gx-K.C[0],dy=gy-K.C[1];
+    x.push(gx);y.push(gy);z.push(K.C[2]+Math.sqrt(K.RE*K.RE-dx*dx-dy*dy))}
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++){const a=r*(n+1)+c,b=a+1,cc=a+n+1,d=cc+1;i.push(a,b);j.push(b,d);k.push(cc,cc)}
+  return{type:'mesh3d',x,y,z,i,j,k,flatshading:true,lighting:{ambient:1,diffuse:0,specular:0,fresnel:0},hoverinfo:'skip',name:'ground'}}
+const plain={...ground(44),color:'#556b2f',opacity:.25};   // light plain ground, also shown when the map is switched off
+// map ground: K.MAP holds one colour per cell (6 hex digits each, row by row), or is null when there is no map
+let gmap=plain;
+if(K.MAP){const fc=[];for(let c=0;c<K.GN*K.GN;c++){const h='#'+K.MAP.substr(6*c,6);fc.push(h,h)}gmap={...ground(K.GN),facecolor:fc,opacity:1}}
+else{$('mprow').style.display='none'}
+$('credit').textContent=K.MAP?K.CREDIT:'';
 const col=s=>[[0,s],[1,s]];   // single-colour colorscale
-// 3-D traces. Indices matter: update() restyles 1 (ellipsoid), 5 (path), 6 (arrowhead), 7 (RX-P-TX lines), 8 (point P)
+// 3-D traces. Indices matter: update() restyles 1 (ellipsoid), 5 (path), 6 (arrowhead), 7 (RX-P-TX lines), 8 (point P);
+// the map checkbox switches between 0 (map ground) and 9 (plain ground)
 const tr=[
- {type:'mesh3d',x:gx,y:gy,z:gz,i:gi,j:gj,k:gk,...gnd,flatshading:true,lighting:{ambient:1,diffuse:0,specular:0,fresnel:0},hoverinfo:'skip',name:'ground'},
+ gmap,
  {type:'surface',x:[[0]],y:[[0]],z:[[0]],showscale:false,opacity:.33,colorscale:col('#4c78a8'),hoverinfo:'skip',name:'equal-path ellipsoid'},
  {type:'scatter3d',mode:'markers+text',x:[T[0]],y:[T[1]],z:[T[2]],text:['WDPN TX'],textposition:'top center',marker:{size:6,color:'red'},name:'TX'},
  {type:'scatter3d',mode:'markers+text',x:[R[0]],y:[R[1]],z:[R[2]],text:['RX'],textposition:'top center',marker:{size:6,color:'blue'},name:'RX'},
@@ -241,7 +253,8 @@ const tr=[
  {type:'scatter3d',mode:'lines',x:[0,0],y:[0,0],z:[0,0],line:{color:'green',width:7},name:'meteor path'},
  {type:'cone',x:[0],y:[0],z:[0],u:[1],v:[0],w:[0],sizemode:'absolute',sizeref:14,anchor:'tip',showscale:false,colorscale:col('green'),hoverinfo:'skip'},
  {type:'scatter3d',mode:'lines',x:[0,0],y:[0,0],z:[0,0],line:{color:'rgba(120,120,120,.8)',width:2},name:'RX→P→TX'},
- {type:'scatter3d',mode:'markers',x:[0],y:[0],z:[0],marker:{size:6,color:'black'},name:'reflection point'}];
+ {type:'scatter3d',mode:'markers',x:[0],y:[0],z:[0],marker:{size:6,color:'black'},name:'reflection point'},
+ {...plain,visible:false}];
 const dark=matchMedia('(prefers-color-scheme:dark)').matches;   // match plot text to the page theme
 // layout for the 3-D plot (lay) and, below, for the Doppler-vs-distance plot (lay2)
 const lay={margin:{l:0,r:0,t:0,b:0},showlegend:false,paper_bgcolor:'rgba(0,0,0,0)',font:{color:dark?'#ddd':'#222'},
@@ -252,7 +265,6 @@ const lay2={margin:{l:55,r:10,t:22,b:36},title:{text:'Doppler along the trail (t
  paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:dark?'#ddd':'#222'},showlegend:false,
  shapes:[{type:'rect',xref:'paper',x0:0,x1:1,yref:'y',y0:-100,y1:100,fillcolor:'rgba(26,127,55,.15)',line:{width:0}},{type:'line',x0:0,x1:0,yref:'paper',y0:0,y1:1,line:{dash:'dot',color:'gray'}}]};
 Plotly.newPlot('g2',[{x:[0],y:[0],mode:'lines',line:{color:'#d62728'}}],lay2,{responsive:true});
-const $=id=>document.getElementById(id);   // shorthand for getElementById
 // slider ids and the unit shown next to each value label
 const ids=['x','y','h','az','d','v'],unit={x:' km',y:' km',h:' km',az:'°',d:'°',v:' km/s'};
 // recompute everything from the sliders and redraw both plots and the readout
@@ -264,12 +276,11 @@ function update(){
   const P=place(x,y,h),v=vel(P,az,d),f=fD(P,v,vk),E=ellipsoid(P);
   const ok=Math.abs(f)<=100,L=60;   // ok: within +-100 Hz; L: half-length of drawn trail (km)
   const a0=sub(P,sc(v,L)),a1=add(P,sc(v,L));   // trail endpoints, a1 = leading end
-  Plotly.restyle('g3',{x:[E.X],y:[E.Y],z:[E.Zz]},[1]);
-  const c=ok?'#1a7f37':'#d62728';
-  Plotly.restyle('g3',{x:[[a0[0],a1[0]]],y:[[a0[1],a1[1]]],z:[[a0[2],a1[2]]],'line.color':c},[5]);
-  Plotly.restyle('g3',{x:[[a1[0]]],y:[[a1[1]]],z:[[a1[2]]],u:[[v[0]]],v:[[v[1]]],w:[[v[2]]],colorscale:[col(c)]},[6]);
-  Plotly.restyle('g3',{x:[[R[0],P[0],T[0]]],y:[[R[1],P[1],T[1]]],z:[[R[2],P[2],T[2]]]},[7]);
-  Plotly.restyle('g3',{x:[[P[0]]],y:[[P[1]]],z:[[P[2]]]},[8]);
+  const c=ok?'#1a7f37':'#d62728',U=undefined;
+  // one restyle for traces 1, 5, 6, 7, 8 (each restyle redraws the whole scene, map included); U = leave unchanged
+  const pts=i=>[E[['X','Y','Zz'][i]],[a0[i],a1[i]],[a1[i]],[R[i],P[i],T[i]],[P[i]]];
+  Plotly.restyle('g3',{x:pts(0),y:pts(1),z:pts(2),'line.color':[U,c,U,U,U],u:[U,U,[v[0]],U,U],v:[U,U,[v[1]],U,U],w:[U,U,[v[2]],U,U],
+    colorscale:[U,U,col(c),U,U]},[1,5,6,7,8]);
   $('fd').textContent=(f>=0?'+':'')+f.toFixed(0)+' Hz';$('fd').className=ok?'ok':'bad';
   const b=bis(P),fr=frame(P);   // bisector and local frame, for the info text
   $('fdinfo').firstChild.innerHTML=`at reflection point; max possible ±${(vk*1000/K.LAM*nrm(b)).toFixed(0)} Hz at ${vk} km/s.<br>Path length TX→P→RX = ${E.S.toFixed(1)} km; ranges ${nrm(sub(P,R)).toFixed(0)} km (RX), ${nrm(sub(P,T)).toFixed(0)} km (TX).<br>Bisector elevation ${(Math.asin(dot(b,fr.up)/nrm(b))/D2R).toFixed(0)}°.`;
@@ -286,6 +297,8 @@ $('snap').onclick=()=>{const x=+$('x').value,y=+$('y').value,h=+$('h').value,az=
   if(d>=0&&d<=90){$('d').value=d.toFixed(1);update()}else{$('fdinfo').firstChild.innerHTML='<b>No 0 Hz descent at this heading</b> (it would have to climb: '+d.toFixed(1)+'°). Try another heading.'}};
 // preset buttons: put the reflection point 1/4 from RX, at the midpoint, or 1/4 from TX, on the baseline
 document.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>{$('x').value={q:-52,m:0,t:52}[b.dataset.p];$('y').value=0;update()});
+// map checkbox: show the map ground (trace 0) or the light plain ground (trace 9)
+$('mp').onchange=e=>Plotly.restyle('g3',{visible:[e.target.checked,!e.target.checked]},[0,9]);
 // vertical exaggeration checkbox: double the true-scale height of the box (K.AR)
 $('ex').onchange=e=>Plotly.relayout('g3',{'scene.aspectratio':e.target.checked?{...K.AR,z:2*K.AR.z}:K.AR});
 update();
@@ -434,12 +447,13 @@ def scale_page(page, base_km, tx_name, rx_name, left_dir):
 def _tile(z, x, y):
     """One map tile as an RGB array, from TILE_CACHE if it was downloaded before."""
     from PIL import Image
-    f = TILE_CACHE / f"{z}_{x}_{y}.png"
+    # one cache folder per tile server, so changing MAP_TILES does not reuse the old server's tiles
+    f = TILE_CACHE / hashlib.md5(MAP_TILES.encode()).hexdigest()[:10] / f"{z}_{x}_{y}.png"
     if not f.exists():
         req = urllib.request.Request(MAP_TILES.format(z=z, x=x, y=y), headers={"User-Agent": "meteor-scatter-3d-notebook"})
         with urllib.request.urlopen(req, timeout=15) as r:
             data = r.read()
-        TILE_CACHE.mkdir(exist_ok=True)
+        f.parent.mkdir(parents=True, exist_ok=True)
         f.write_bytes(data)
     return np.asarray(Image.open(io.BytesIO(f.read_bytes())).convert("RGB"))
 
@@ -490,7 +504,7 @@ def build_interactive(tx_name, rx_name="RX", out_file=PAGE_FILE):
 
     # ground patch: +-G km East/North of RX in GN x GN cells, on the sphere of radius RE about CEN (as drawn by the page)
     base = baseline_km()
-    G, GN, S = float(round(1.6 * base)), 300, 3   # S x S map samples are averaged per cell
+    G, GN, S = float(round(1.6 * base)), MAP_CELLS, MAP_SAMPLES
     u = (np.arange(GN * S) + 0.5) / (GN * S) * 2 * G - G
     x, y = np.meshgrid(u, u)                      # rows run South -> North, like the page's grid
     zg = CEN[2] + np.sqrt(RE ** 2 - (x - CEN[0]) ** 2 - (y - CEN[1]) ** 2)
