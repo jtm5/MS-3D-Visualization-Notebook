@@ -226,8 +226,13 @@ function ellipsoid(P){const S=nrm(sub(P,T))+nrm(sub(P,R)),c=sc(add(T,R),.5),ax=u
   for(let i=0;i<=nt;i++){const th=Math.PI*i/nt,rx=X[i]=[],ry=Y[i]=[],rz=Zz[i]=[];   // th: angle from the major axis
     for(let j=0;j<=np_;j++){const ph=2*Math.PI*j/np_;   // ph: angle around the major axis
       const p=add(add(c,sc(ax,a*Math.cos(th))),sc(add(sc(e1,Math.cos(ph)),sc(e2,Math.sin(ph))),b*Math.sin(th)));
-      const under=nrm(sub(p,K.C))<K.RE;rx.push(under?null:p[0]);ry.push(under?null:p[1]);rz.push(under?null:p[2]);}}
+      // also drop points outside the anchor box (BX, see below), so the shell never changes the scene's scale
+      const under=nrm(sub(p,K.C))<K.RE||Math.abs(p[0])>BX.xy||Math.abs(p[1])>BX.xy||p[2]>BX.z1;
+      rx.push(under?null:p[0]);ry.push(under?null:p[1]);rz.push(under?null:p[2]);}}
   return{X,Y,Zz,S,a,b}}
+// anchor box: an invisible trace (10) spanning a little more than the axis ranges, so the scene's data scale stays fixed
+// as the other traces move; then the map never needs redrawing (see guardMap below)
+const BX={xy:K.G+100,z0:K.ZR[0],z1:K.ZR[1]+80};
 // ground: (n+1)x(n+1) grid over +-K.G km East/North of RX, lifted onto the sphere of radius RE about Earth's center,
 // as a mesh3d trace with two triangles per cell
 function ground(n){const x=[],y=[],z=[],i=[],j=[],k=[];
@@ -243,7 +248,7 @@ else{$('mprow').style.display='none'}
 $('credit').textContent=K.MAP?K.CREDIT:'';
 const col=s=>[[0,s],[1,s]];   // single-colour colorscale
 // 3-D traces. Indices matter: update() restyles 1 (ellipsoid), 5 (path), 6 (arrowhead), 7 (RX-P-TX lines), 8 (point P);
-// the map checkbox switches between 0 (map ground) and 9 (plain ground)
+// the map checkbox switches between 0 (map ground) and 9 (plain ground); 10 is the invisible anchor box
 const tr=[
  gmap,
  {type:'surface',x:[[0]],y:[[0]],z:[[0]],showscale:false,opacity:.33,colorscale:col('#4c78a8'),hoverinfo:'skip',name:'equal-path ellipsoid'},
@@ -254,13 +259,20 @@ const tr=[
  {type:'cone',x:[0],y:[0],z:[0],u:[1],v:[0],w:[0],sizemode:'absolute',sizeref:14,anchor:'tip',showscale:false,colorscale:col('green'),hoverinfo:'skip'},
  {type:'scatter3d',mode:'lines',x:[0,0],y:[0,0],z:[0,0],line:{color:'rgba(120,120,120,.8)',width:2},name:'RX→P→TX'},
  {type:'scatter3d',mode:'markers',x:[0],y:[0],z:[0],marker:{size:6,color:'black'},name:'reflection point'},
- {...plain,visible:false}];
+ {...plain,visible:false},
+ {type:'scatter3d',mode:'markers',x:[-BX.xy,BX.xy],y:[-BX.xy,BX.xy],z:[BX.z0,BX.z1],marker:{size:1,color:'rgba(0,0,0,0)'},hoverinfo:'skip',name:'anchor'}];
 const dark=matchMedia('(prefers-color-scheme:dark)').matches;   // match plot text to the page theme
 // layout for the 3-D plot (lay) and, below, for the Doppler-vs-distance plot (lay2)
 const lay={margin:{l:0,r:0,t:0,b:0},showlegend:false,paper_bgcolor:'rgba(0,0,0,0)',font:{color:dark?'#ddd':'#222'},
  scene:{xaxis:{title:{text:'East km'},range:[-K.G,K.G]},yaxis:{title:{text:'North km'},range:[-K.G,K.G]},zaxis:{title:{text:'Up km'},range:K.ZR},
   aspectmode:'manual',aspectratio:K.AR,camera:{eye:{x:1.2,y:-1.6,z:.8}}}};   // fixed ranges keep RX (the origin) in the center
-Plotly.newPlot('g3',tr,lay,{responsive:true});
+// Plotly redraws every 3-D trace on each restyle (its gl3d scene.plot() calls update() on all of them). The map is by far the
+// heaviest and never changes, so its update() is wrapped to do nothing unless its data, opacity or the scene's scale changed.
+// This uses Plotly internals (_fullLayout.scene._scene); if they are missing, the map simply redraws as before.
+function guardMap(){try{const gd=$('g3'),sc=gd._fullLayout.scene._scene,o=sc.traces[gd._fullData[0].uid];
+  if(!o||o._guarded)return;const up=o.update.bind(o),key=d=>sc.dataScale.join()+'|'+d.opacity;let last=key(o.data);
+  o._guarded=true;o.update=d=>{const k=key(d);if(d.x===o.data.x&&k===last){o.data=d;return}last=k;up(d)}}catch(e){}}
+Plotly.newPlot('g3',tr,lay,{responsive:true}).then(guardMap);
 const lay2={margin:{l:55,r:10,t:22,b:36},title:{text:'Doppler along the trail (the meteor moves →)',font:{size:12}},xaxis:{title:'distance along trail from reflection point P, km'},yaxis:{title:'f_D, Hz'},
  paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:dark?'#ddd':'#222'},showlegend:false,
  shapes:[{type:'rect',xref:'paper',x0:0,x1:1,yref:'y',y0:-100,y1:100,fillcolor:'rgba(26,127,55,.15)',line:{width:0}},{type:'line',x0:0,x1:0,yref:'paper',y0:0,y1:1,line:{dash:'dot',color:'gray'}}]};
@@ -298,7 +310,7 @@ $('snap').onclick=()=>{const x=+$('x').value,y=+$('y').value,h=+$('h').value,az=
 // preset buttons: put the reflection point 1/4 from RX, at the midpoint, or 1/4 from TX, on the baseline
 document.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>{$('x').value={q:-52,m:0,t:52}[b.dataset.p];$('y').value=0;update()});
 // map checkbox: show the map ground (trace 0) or the light plain ground (trace 9)
-$('mp').onchange=e=>Plotly.restyle('g3',{visible:[e.target.checked,!e.target.checked]},[0,9]);
+$('mp').onchange=e=>{Plotly.restyle('g3',{visible:[e.target.checked,!e.target.checked]},[0,9]).then(guardMap)};   // a re-shown map is a new trace object
 // vertical exaggeration checkbox: double the true-scale height of the box (K.AR)
 $('ex').onchange=e=>Plotly.relayout('g3',{'scene.aspectratio':e.target.checked?{...K.AR,z:2*K.AR.z}:K.AR});
 update();
