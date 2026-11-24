@@ -8,12 +8,13 @@ calculations and a self-contained interactive 3D Plotly page (`meteor_core.py`).
 radio amateurs and students exploring meteor scatter observations; it runs locally in VS Code or
 on Binder. See `README.md` for usage.
 
-**Lead**: {{LEAD_NAME_CALLSIGN_AND_AFFILIATION}}
-**Collaborators**: {{COLLABORATORS: names, callsigns, and roles}}
-**HamSCI Working Group**: {{WORKING_GROUP, or "none"}}
-**Institution**: {{INSTITUTION, or "none: this is a volunteer project"}}
-**Funder**: {{FUNDER_AND_GRANT_NUMBER, or "unfunded"}}
-**Project period**: {{PROJECT_PERIOD}}
+**Lead**: J. Tom McMahan, K1FR, HamSCI Community Volunteer
+**Collaborators**: J. Tom McMahan (K1FR). Others to be added.
+**HamSCI Working Group**: None for now. Some or all of this repository is expected to be merged into the HamSCI
+Meteor Working Group's work later.
+**Institution**: None: this is an independent volunteer project.
+**Funder**: Unfunded.
+**Project period**: 2026 to present.
 
 ## Project Goal
 Show which reflection points and trail directions (heading, descent, speed) give near-zero or a
@@ -41,6 +42,7 @@ directories to match the project. The scaffold provides:
 MS-3D-Visualization-Notebook/
 ├── CLAUDE.md                     ← this file; project instructions for Claude
 ├── README.md
+├── LICENSE                       ← MIT
 ├── CITATION.cff                  ← make the project citable
 ├── .gitignore
 ├── .gitmodules                   ← present only if you add submodules

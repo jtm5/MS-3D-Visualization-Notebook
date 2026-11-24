@@ -43,3 +43,15 @@ command produces this format and appends it in the right order.
 - **Nature of Contribution**: Scaffolding
 - **Human Review Status**: Pending review
 - **Git Hash**: see the commit adding this entry on branch `adopt-ai-project-template`
+
+## [2026-11-24 17:40 UTC]
+- **Tool**: Claude (Anthropic), claude-opus-5-5
+- **Session Purpose**: Fill in the template placeholders left open by PR #1, from answers given
+  by N. A. Frissell (W2NAF) on Tom's behalf: lead, collaborators, working group, institution,
+  funder, project period, disclosure name, citation author and license.
+- **Sections/Files Affected**: `CLAUDE.md` (project details, repo tree), `.claude/rules/ai-governance.md`
+  (Tiers 2 and 3 removed; disclosure name), `CITATION.cff` (author, license), `LICENSE` (new, MIT),
+  `.claude/template.json` (`LICENSE` and `ai-governance.md` now customized).
+- **Nature of Contribution**: Edit
+- **Human Review Status**: Pending review
+- **Git Hash**: see the commit adding this entry on branch `fill-template-placeholders`
