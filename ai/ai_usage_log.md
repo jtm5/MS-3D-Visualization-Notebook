@@ -37,7 +37,8 @@ command produces this format and appends it in the right order.
   the maintainer.
 - **Sections/Files Affected**: `.claude/` (new), `.github/ISSUE_TEMPLATE/` (new), `CLAUDE.md`,
   `CITATION.cff`, `ai/ai_usage_log.md`, `docs/GETTING_STARTED.md` (all new), `.gitignore`
-  (template's, plus `.tile_cache/`). Template `README.md`, `LICENSE` and
+  (the original four entries kept first, in their original order, after review feedback that
+  the reordered diff looked like a deletion; the template's entries follow). Template `README.md`, `LICENSE` and
   `.claude/rules/latex-writing.md` not adopted.
 - **Nature of Contribution**: Scaffolding
 - **Human Review Status**: Pending review

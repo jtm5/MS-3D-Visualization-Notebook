@@ -1,3 +1,8 @@
+__pycache__/
+.ipynb_checkpoints/
+.venv/
+.tile_cache/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -10,10 +15,8 @@ Thumbs.db
 .idea/
 
 # Python
-__pycache__/
 *.py[cod]
 *.egg-info/
-.venv/
 venv/
 env/
 *.egg
@@ -40,7 +43,6 @@ env/
 *.vrb
 
 # Jupyter
-.ipynb_checkpoints/
 
 # Data: keep bulk and raw data out of git.
 # Fetch it from its archive, or regenerate it with a committed builder.
@@ -68,6 +70,3 @@ figures/
 # Claude Code local state
 .claude/settings.local.json
 CLAUDE.local.md
-
-# Map tiles cached by meteor_core.py
-.tile_cache/
