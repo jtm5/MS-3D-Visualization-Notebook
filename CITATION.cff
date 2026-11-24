@@ -1,0 +1,20 @@
+# Replace this file's contents with your own project's citation metadata after
+# instantiating the template. Do not list AI tools as authors.
+cff-version: 1.2.0
+message: "If you use this project, please cite it as below."
+authors:
+- family-names: "YOUR_FAMILY_NAME"
+  given-names: "YOUR_GIVEN_NAME"
+  orcid: "https://orcid.org/0000-0000-0000-0000"
+title: "Meteor Scatter 3D Explorer"
+version: 0.1.0
+doi: "[DOI to be assigned]"
+url: "https://github.com/jtm5/MS-3D-Visualization-Notebook"
+keywords:
+  - HamSCI
+  - amateur radio
+  - space weather
+  - ionosphere
+  - citizen science
+  - meteor scatter
+  - Doppler

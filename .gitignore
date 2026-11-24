@@ -2,3 +2,71 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 .tile_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Python
+*.py[cod]
+*.egg-info/
+venv/
+env/
+*.egg
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# LaTeX build artifacts. The compiled PDF is not listed: it is committed with its source.
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl
+*.bcf
+*.blg
+*.run.xml
+*.nav
+*.snm
+*.vrb
+
+# Jupyter
+
+# Data: keep bulk and raw data out of git.
+# Fetch it from its archive, or regenerate it with a committed builder.
+data/raw/
+data/cache/
+*.h5
+*.hdf5
+*.nc
+*.npz
+*.sqlite
+*.wav
+*.iq
+*.sc16
+
+# Generated figures in a working repo: the code is the artifact.
+# Curated memo and report PDFs are committed; bulk figure output is not.
+figs/
+figures/
+
+# Credentials
+.env
+*.key
+*.pem
+
+# Claude Code local state
+.claude/settings.local.json
+CLAUDE.local.md
