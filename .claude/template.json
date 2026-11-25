@@ -8,11 +8,12 @@
     "CLAUDE.md",
     "CITATION.cff",
     "ai/ai_usage_log.md",
-    ".gitignore"
+    ".gitignore",
+    ".claude/rules/ai-governance.md",
+    "LICENSE"
   ],
   "not_adopted": [
     "README.md",
-    "LICENSE",
     ".claude/rules/latex-writing.md"
   ]
 }
