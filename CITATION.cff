@@ -3,10 +3,10 @@ cff-version: 1.2.0
 message: "If you use this project, please cite it as below."
 authors:
 - family-names: "McMahan"
-  given-names: "J. Tom"
+  given-names: "Tom"
+  orcid: "https://orcid.org/0000-0002-0990-3631"
 title: "Meteor Scatter 3D Explorer"
 version: 0.1.0
-doi: "[DOI to be assigned]"
 url: "https://github.com/jtm5/MS-3D-Visualization-Notebook"
 license: MIT
 keywords:
