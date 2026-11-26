@@ -18,7 +18,7 @@ entry written from memory weeks later is not a record.
 - **Sections/Files Affected**: Specific files, sections, or documents touched
 - **Nature of Contribution**: Draft / Edit / Analysis / Code generation / Research / Scaffolding
 - **Human Review Status**: Reviewed and verified / Partially reviewed / Pending review
-- **Git Hash**: <filled in after committing>
+- **Git Hash**: 8cc03fb on branch `complete-template-setup` (PR to be opened by Tom via GitHub web)
 ```
 
 The date and time come from the system clock via `date`, never from an estimate. The `/commit`
@@ -66,4 +66,4 @@ command produces this format and appends it in the right order.
   (review status of the two earlier entries), `docs/GETTING_STARTED.md` (deleted).
 - **Nature of Contribution**: Analysis, Edit (docs)
 - **Human Review Status**: Pending review
-- **Git Hash**: <filled in after committing>
+- **Git Hash**: 8cc03fb on branch `complete-template-setup` (PR to be opened by Tom via GitHub web)
