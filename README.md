@@ -112,3 +112,7 @@ If you edit `meteor_core.py` or `meteor_ui.py`, restart the kernel and Run All a
 - Straight trails at constant speed. There is no deceleration or ablation model.
 - Specular reflection geometry only. Trail orientation and the Fresnel-zone and reflection-condition constraints are not enforced. The page shows what the Doppler would be at a point, not whether that point is a viable reflector.
 - The form accepts baselines from 5 km to 1500 km.
+
+## AI disclosure
+
+AI assistance was used throughout this project. Claude (Anthropic) helped write all of the code: the notebooks, `meteor_ui.py`, `meteor_core.py` and the 3D page template. Claude (`claude-opus-5-5`) also added the project scaffolding (AI governance rules, commit workflow, issue templates, citation file and license) and filled in project details in those files. The author reviews AI-assisted changes, and the science and conclusions are the author's. Every AI-assisted session is recorded in [`ai/ai_usage_log.md`](ai/ai_usage_log.md), and AI-assisted commits are marked `[AI-assisted]` in the git history.

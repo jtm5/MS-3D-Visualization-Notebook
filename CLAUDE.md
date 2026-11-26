@@ -8,8 +8,8 @@ calculations and a self-contained interactive 3D Plotly page (`meteor_core.py`).
 radio amateurs and students exploring meteor scatter observations; it runs locally in VS Code or
 on Binder. See `README.md` for usage.
 
-**Lead**: J. Tom McMahan, K1FR, HamSCI Community Volunteer
-**Collaborators**: J. Tom McMahan (K1FR). Others to be added.
+**Lead**: Tom McMahan, K1FR, HamSCI Community Volunteer
+**Collaborators**: Tom McMahan (K1FR), Nathaniel Frissell (W2NAF), Rob Suggs (NN4NT), Robert Hipple.
 **HamSCI Working Group**: None for now. Some or all of this repository is expected to be merged into the HamSCI
 Meteor Working Group's work later.
 **Institution**: None: this is an independent volunteer project.
